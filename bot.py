@@ -99,7 +99,7 @@ async def modhost(interaction: discord.Interaction, code: str):
         name="Join code",
         value=f"`{code}`",
         inline=False
-    )embed.set_footer(text="Use /endhost to close your lobby")
+    embed.set_footer(text="Use /endhost to close your lobby")
 
     await interaction.response.send_message(embed=embed)
 
@@ -141,3 +141,4 @@ async def mylobby(interaction: discord.Interaction):
     await interaction.response.send_message("\n".join(lines), ephemeral=True)
 
 bot.run(TOKEN)
+
