@@ -34,7 +34,7 @@ async def help_cmd(interaction: discord.Interaction):
     embed.add_field(name="/modhost CODE", value="Host a modded lobby", inline=False)
     embed.add_field(name="/endhost", value="End your lobby", inline=False)
     embed.add_field(name="/mylobby", value="Show your lobby", inline=False)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await interaction.response.send_message(embed=embed)
 
 @tree.command(name="host", description="Host a normal lobby")
 @app_commands.describe(code="6-letter lobby code")
@@ -136,4 +136,5 @@ async def mylobby(interaction: discord.Interaction):
     await interaction.response.send_message("\n".join(msg), ephemeral=True)
 
 client.run(TOKEN)
+
 
