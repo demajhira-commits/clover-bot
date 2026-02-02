@@ -94,7 +94,8 @@ async def modhost(interaction: discord.Interaction, code: str):
         description=f"{interaction.user.mention} is hosting a modded lobby"
     )
     embed.add_field(name="Join code", value=f"`{code}`", inline=False)
-    embed.set_footer(text="Use /endhost to close your lobby")await interaction.response.send_message(content=ping, embed=embed)
+    embed.set_footer(text="Use /endhost to close your lobby")
+    await interaction.response.send_message(content=ping, embed=embed)
 
 @tree.command(name="endhost", description="End your lobby")
 async def endhost(interaction: discord.Interaction):
@@ -135,3 +136,4 @@ async def mylobby(interaction: discord.Interaction):
     await interaction.response.send_message("\n".join(msg), ephemeral=True)
 
 client.run(TOKEN)
+
