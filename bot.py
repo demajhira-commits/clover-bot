@@ -46,7 +46,18 @@ async def help_cmd(interaction: discord.Interaction):
     embed.add_field(name="/host CODE", value="Host a normal lobby", inline=False)  
     embed.add_field(name="/modhost CODE", value="Host a modded lobby", inline=False)  
     embed.add_field(name="/endhost", value="End your lobby", inline=False)  
-    embed.add_field(name="/mylobby", value="Show your lobby", inline=False)  
+  embed.add_field(
+    name="Triggers (automatic replies)",
+    value=(
+        "when do we play • "
+        "when do we usually play • "
+        "is someone hosting • "
+        "anyone hosting • "
+        "are there lobbies • "
+        "when are we playing"
+    ),
+    inline=False
+)
   
     # visible to everyone (NOT ephemeral)  
     await interaction.response.send_message(embed=embed)  
@@ -205,3 +216,4 @@ async def on_message(message: discord.Message):
   
 # ---- RUN ----  
 client.run(TOKEN)  
+
