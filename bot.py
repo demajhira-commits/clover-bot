@@ -8,6 +8,11 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 NORMAL_ROLE_ID = 1467862590670639249
 MODDED_ROLE_ID = 1467868524197183508
 
+LOBBY_CHANNEL_IDS= [
+    1467900719070842980, 
+    1467900753489428714,
+]
+
 intents = discord.Intents.default()
 intents.message_content=True 
 client = discord.Client(intents=intents)
@@ -66,7 +71,8 @@ async def host(interaction: discord.Interaction, code: str):
     embed.add_field(name="Join code", value=f"`{code}`", inline=False)
     embed.set_footer(text="Use /endhost to close your lobby")
 
-    await interaction.response.send_message(content=ping, embed=embed)
+    await interaction.response.send_message(content=ping, embed=embed allowed_mentions=discord.AllowedMentions(roles=True)
+    )
 
 @tree.command(name="modhost", description="Host a modded lobby")
 @app_commands.describe(code="6-letter lobby code")
@@ -135,8 +141,32 @@ async def mylobby(interaction: discord.Interaction):
         msg.append(f"🧪 Modded lobby: `{user['modded']}`")
 
     await interaction.response.send_message("\n".join(msg), ephemeral=True)
+    @client.event
+async def on_message(message: discord.Message):
+    # Ignore bots (including itself)
+    if message.author.bot:
+        return
+
+    content = message.content.lower()
+
+    triggers = [
+        "when do we play",
+        "when do we usually play",
+        "is someone hosting",
+        "anyone hosting",
+        "are there lobbies",
+        "when are we playing",
+        "is anyone hosting"
+    ]
+
+    if any(trigger in content for trigger in triggers):
+        await message.channel.send(
+            "🛸 We usually host at <t:1770060600:t>, "
+            "but you can always check these channels for current lobbies!" {channels_text}
+        )
 
 client.run(TOKEN)
+
 
 
 
