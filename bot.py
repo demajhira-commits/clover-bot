@@ -3,19 +3,11 @@ import re
 import discord
 from discord.ext import commands
 
-# =====================
-# CONFIG
-# =====================
 PREFIX = "cl!"
 
 HOSTED_ROLE_ID = 1467862590670639249
 MODDED_ROLE_ID = 1467868524197183508
 
-TOKEN = os.getenv("DISCORD_TOKEN")
-
-# =====================
-# BOT SETUP
-# =====================
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -25,47 +17,24 @@ bot = commands.Bot(
     help_command=None
 )
 
-active_lobbies = {}  # user_id -> (code, modded_bool)
+active_lobbies = {}  # user_id -> (code, is_modded)
 
-# =====================
-# HELPERS
-# =====================
-def clean_lobby_code(code: str) -> str | None:
+
+def clean_lobby_code(code: str) -> str:
     code = code.strip().upper()
-    return code if re.fullmatch(r"[A-Z]{6}", code) else None
+    return code if re.fullmatch(r"[A-Z]{6}", code) else ""
 
 
-class CopyCodeView(discord.ui.View):
-    def __init__(self, code: str):
-        super().__init__(timeout=None)
-        self.add_item(
-            discord.ui.Button(
-                label="Copy code",
-                emoji="📋",
-                style=discord.ButtonStyle.secondary,
-                copy_text=code
-            )
-        )
-
-# =====================
-# EVENTS
-# =====================
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
 
-# =====================
-# COMMANDS
-# =====================
-@bot.command()
-async def hello(ctx):
-    await ctx.send("Hello! I am alive 🤖")
 
 @bot.command(name="help")
-async def help_cmd(ctx):
+async def help_cmd(ctx: commands.Context):
     embed = discord.Embed(
         title="Clover Bot Commands",
-        description=f"Prefix: `{PREFIX}`"
+        description=f"Prefix: `{PREFIX}`",
     )
     embed.add_field(
         name=f"{PREFIX}host <CODE>",
@@ -73,8 +42,8 @@ async def help_cmd(ctx):
         inline=False
     )
     embed.add_field(
-        name=f"{PREFIX}hostmod <CODE>",
-        value="Host a **modded** lobby",
+        name=f"{PREFIX}modhost <CODE>",
+        value=f"Host a modded lobby",
         inline=False
     )
     embed.add_field(
@@ -84,69 +53,75 @@ async def help_cmd(ctx):
     )
     embed.add_field(
         name=f"{PREFIX}mylobby",
-        value="Show your current lobby",
+        value="Show your active lobby",
         inline=False
     )
     await ctx.send(embed=embed)
 
-@bot.command()
-async def host(ctx, code: str):
-    await _host_lobby(ctx, code, modded=False)
 
-@bot.command()
-async def hostmod(ctx, code: str):
-    await _host_lobby(ctx, code, modded=True)
-
-async def _host_lobby(ctx, code: str, modded: bool):
-    lobby_code = clean_lobby_code(code)
-    if not lobby_code:
-        await ctx.send("❌ Code must be **6 letters** (example: HHHIGG)")
-        return
-
-    active_lobbies[ctx.author.id] = (lobby_code, modded)
+async def send_lobby(ctx, code, is_modded):
+    active_lobbies[ctx.author.id] = (code, is_modded)
 
     role_ping = ""
+    role_id = MODDED_ROLE_ID if is_modded else HOSTED_ROLE_ID
+
     if ctx.guild:
-        role_id = MODDED_ROLE_ID if modded else HOSTED_ROLE_ID
         role = ctx.guild.get_role(role_id)
         if role:
-            role_ping = role.mention
+            role_ping = role.mention + " "
 
     embed = discord.Embed(
         title="🛸 Lobby Hosted!",
-        description=f"Lobby hosted by {ctx.author.mention}"
-    )
-    embed.add_field(name="Join code", value=f"`{lobby_code}`", inline=False)
-    embed.set_footer(text=f"Use {PREFIX}endhost to close your lobby")
-
-    # IMPORTANT: ping must be OUTSIDE the embed
-    await ctx.send(
-        content=role_ping,
-        embed=embed,
-        view=CopyCodeView(lobby_code)
+        description=f"Lobby hosted by {ctx.author.mention}",
     )
 
-@bot.command()
-async def endhost(ctx):
+    embed.add_field(
+        name="Join code (tap to copy)",
+        value=f"```{code}```",
+        inline=False
+    )
+
+    embed.set_footer(text=f"Use {PREFIX}endhost to close your lobby.")
+
+    await ctx.send(role_ping, embed=embed)
+
+
+@bot.command(name="host")
+async def host_cmd(ctx: commands.Context, code: str):
+    lobby_code = clean_lobby_code(code)
+    if not lobby_code:
+        return await ctx.send("❌ Use a valid 6-letter code.")
+
+    await send_lobby(ctx, lobby_code, is_modded=False)
+
+
+@bot.command(name="modhost")
+async def modhost_cmd(ctx: commands.Context, code: str):
+    lobby_code = clean_lobby_code(code)
+    if not lobby_code:
+        return await ctx.send("❌ Use a valid 6-letter code.")
+
+    await send_lobby(ctx, lobby_code, is_modded=True)
+
+
+@bot.command(name="endhost")
+async def endhost_cmd(ctx: commands.Context):
     if ctx.author.id not in active_lobbies:
-        await ctx.send("You are not hosting a lobby.")
-        return
+        return await ctx.send("You are not hosting a lobby.")
 
     code, _ = active_lobbies.pop(ctx.author.id)
     await ctx.send(f"✅ {ctx.author.mention} ended lobby `{code}`.")
 
-@bot.command()
-async def mylobby(ctx):
+
+@bot.command(name="mylobby")
+async def mylobby_cmd(ctx: commands.Context):
     data = active_lobbies.get(ctx.author.id)
     if not data:
-        await ctx.send("You are not hosting a lobby.")
-        return
+        return await ctx.send("You are not hosting a lobby.")
 
-    code, modded = data
-    tag = "🧪 Modded" if modded else "🎮 Normal"
-    await ctx.send(f"{tag} lobby code: `{code}`")
+    code, is_modded = data
+    lobby_type = "Modded" if is_modded else "Normal"
+    await ctx.send(f"🛸 **{lobby_type} lobby code:** ```{code}```")
 
-# =====================
-# RUN
-# =====================
-bot.run(TOKEN)
+
+bot.run(os.getenv("DISCORD_TOKEN"))
