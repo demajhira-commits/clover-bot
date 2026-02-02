@@ -9,6 +9,7 @@ NORMAL_ROLE_ID = 1467862590670639249
 MODDED_ROLE_ID = 1467868524197183508
 
 intents = discord.Intents.default()
+intents.message_content=True 
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
@@ -136,5 +137,6 @@ async def mylobby(interaction: discord.Interaction):
     await interaction.response.send_message("\n".join(msg), ephemeral=True)
 
 client.run(TOKEN)
+
 
 
