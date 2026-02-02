@@ -1,163 +1,137 @@
 import os
 import re
 import discord
-from discord.ext import commands
+from discord import app_commands
 
-# ===== CONFIG =====
-PREFIX = "cl!"
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 NORMAL_ROLE_ID = 1467862590670639249
 MODDED_ROLE_ID = 1467868524197183508
 
-AUTO_REPLY_TIMESTAMP = "<t:1770060600:t>"
-LOBBY_CHANNEL_NAME = "<#1467841323678699582>"
-
-# ==================
-
 intents = discord.Intents.default()
-intents.message_content = True
+client = discord.Client(intents=intents)
+tree = app_commands.CommandTree(client)
 
-bot = commands.Bot(
-    command_prefix=PREFIX,
-    intents=intents,
-    help_command=None
-)
-
-# user_id -> {"type": "normal/modded", "code": "XXXXXX"}
+# user_id -> {"normal": str | None, "modded": str | None}
 active_lobbies = {}
-
 
 def clean_code(code: str) -> str | None:
     code = code.strip().upper()
     return code if re.fullmatch(r"[A-Z]{6}", code) else None
 
-
-@bot.event
+@client.event
 async def on_ready():
-    print(f"Logged in as {bot.user}")
+    await tree.sync()
+    print(f"Logged in as {client.user}")
 
-
-# ================== HELP ==================
-@bot.command()
-async def help(ctx):
+@tree.command(name="help", description="Show Clover Bot commands")
+async def help_cmd(interaction: discord.Interaction):
     embed = discord.Embed(
         title="Clover Bot Commands",
-        description=f"Prefix: `{PREFIX}`"
+        description="Use slash commands below 👇"
     )
+    embed.add_field(name="/host CODE", value="Host a normal lobby", inline=False)
+    embed.add_field(name="/modhost CODE", value="Host a modded lobby", inline=False)
+    embed.add_field(name="/endhost", value="End your lobby", inline=False)
+    embed.add_field(name="/mylobby", value="Show your lobby", inline=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    embed.add_field(
-        name=f"`{PREFIX}host CODE`",
-        value="Host a **normal** lobby\nExample:\n```cl!host HHHIGG```",
-        inline=False
-    )
-
-    embed.add_field(
-        name=f"`{PREFIX}modhost CODE`",
-        value="Host a **modded** lobby\n```cl!modhost HHHIGG```",
-        inline=False
-    )
-
-    embed.add_field(
-        name=f"`{PREFIX}endhost`",
-        value="End your hosted lobby",
-        inline=False
-    )
-
-    embed.add_field(
-        name=f"`{PREFIX}mylobby`",
-        value="Show your active lobby",
-        inline=False
-    )
-
-    await ctx.send(embed=embed)
-
-
-# ================== HOST ==================
-async def do_host(ctx, code: str, lobby_type: str):
-    lobby_code = clean_code(code)
-    if not lobby_code:
-        await ctx.send("❌ Invalid code. Use **6 letters** like:\n```HHHIGG```")
-        return
-
-    existing = active_lobbies.get(ctx.author.id)
-
-    if existing and existing["type"] == lobby_type:
-        await ctx.send(
-            f"⚠️ You are already hosting a **{lobby_type}** lobby!\n"
-            f"Code:\n```{existing['code']}```"
+@tree.command(name="host", description="Host a normal lobby")
+@app_commands.describe(code="6-letter lobby code")
+async def host(interaction: discord.Interaction, code: str):
+    code = clean_code(code)
+    if not code:
+        return await interaction.response.send_message(
+            "❌ Invalid code. Use 6 letters like `HHHIGG`.", ephemeral=True
         )
-        return
 
-    active_lobbies[ctx.author.id] = {
-        "type": lobby_type,
-        "code": lobby_code
-    }
+    user = active_lobbies.setdefault(interaction.user.id, {"normal": None, "modded": None})
 
-    role_id = NORMAL_ROLE_ID if lobby_type == "normal" else MODDED_ROLE_ID
-    role = ctx.guild.get_role(role_id) if ctx.guild else None
+    if user["normal"]:
+        return await interaction.response.send_message(
+            f"🚨 You are already hosting a normal lobby: `{user['normal']}`",
+            ephemeral=True
+        )
+
+    user["normal"] = code
+
+    role = interaction.guild.get_role(NORMAL_ROLE_ID) if interaction.guild else None
     ping = role.mention if role else ""
 
     embed = discord.Embed(
         title="🛸 Lobby Hosted!",
-        description=f"Hosted by {ctx.author.mention}"
+        description=f"{interaction.user.mention} is hosting a lobby"
+    )
+    embed.add_field(name="Join code", value=f"`{code}`", inline=False)
+    embed.set_footer(text="Use /endhost to close your lobby")
+
+    await interaction.response.send_message(content=ping, embed=embed)
+
+@tree.command(name="modhost", description="Host a modded lobby")
+@app_commands.describe(code="6-letter lobby code")
+async def modhost(interaction: discord.Interaction, code: str):
+    code = clean_code(code)
+    if not code:
+        return await interaction.response.send_message(
+            "❌ Invalid code. Use 6 letters like `HHHIGG`.", ephemeral=True
+        )
+
+    user = active_lobbies.setdefault(interaction.user.id, {"normal": None, "modded": None})
+
+    if user["modded"]:
+        return await interaction.response.send_message(
+            f"🚨 You are already hosting a modded lobby: `{user['modded']}`",
+            ephemeral=True
+        )
+
+    user["modded"] = code
+
+    role = interaction.guild.get_role(MODDED_ROLE_ID) if interaction.guild else None
+    ping = role.mention if role else ""
+
+    embed = discord.Embed(
+        title="🧪 Modded Lobby Hosted!",
+        description=f"{interaction.user.mention} is hosting a modded lobby"
+    )
+    embed.add_field(name="Join code", value=f"`{code}`", inline=False)
+    embed.set_footer(text="Use /endhost to close your lobby")await interaction.response.send_message(content=ping, embed=embed)
+
+@tree.command(name="endhost", description="End your lobby")
+async def endhost(interaction: discord.Interaction):
+    user = active_lobbies.get(interaction.user.id)
+
+    if not user or (not user["normal"] and not user["modded"]):
+        return await interaction.response.send_message(
+            "❌ You are not hosting any lobbies.", ephemeral=True
+        )
+
+    ended = []
+    if user["normal"]:
+        ended.append(user["normal"])
+        user["normal"] = None
+    if user["modded"]:
+        ended.append(user["modded"])
+        user["modded"] = None
+
+    await interaction.response.send_message(
+        f"✅ Ended lobby/lobbies: {', '.join(f'`{c}`' for c in ended)}"
     )
 
-    embed.add_field(
-        name="Join Code",
-        value=f"```{lobby_code}```",
-        inline=False
-    )
+@tree.command(name="mylobby", description="Show your active lobby")
+async def mylobby(interaction: discord.Interaction):
+    user = active_lobbies.get(interaction.user.id)
 
-    embed.set_footer(text=f"Use {PREFIX}endhost to close your lobby")
+    if not user or (not user["normal"] and not user["modded"]):
+        return await interaction.response.send_message(
+            "❌ You are not hosting any lobbies.", ephemeral=True
+        )
 
-    await ctx.send(content=ping, embed=embed)
+    msg = []
+    if user["normal"]:
+        msg.append(f"🛸 Normal lobby: `{user['normal']}`")
+    if user["modded"]:
+        msg.append(f"🧪 Modded lobby: `{user['modded']}`")
 
+    await interaction.response.send_message("\n".join(msg), ephemeral=True)
 
-@bot.command()
-async def host(ctx, code: str):
-    await do_host(ctx, code, "normal")
-
-
-@bot.command()
-async def modhost(ctx, code: str):
-    await do_host(ctx, code, "modded")
-
-
-# ================== END ==================
-@bot.command()
-async def endhost(ctx):
-    if ctx.author.id not in active_lobbies:
-        await ctx.send("❌ You are not hosting any lobbies currently.")
-        return
-
-    ended = active_lobbies.pop(ctx.author.id)
-    await ctx.send(
-        f"✅ {ctx.author.mention} ended their **{ended['type']}** lobby."
-    )
-
-
-# ================== MY LOBBY ==================
-@bot.command()
-async def mylobby(ctx):
-    lobby = active_lobbies.get(ctx.author.id)
-    if not lobby:
-        await ctx.send("❌ You are not hosting any lobbies currently.")
-        return
-
-    await ctx.send(
-        f"🛸 Your **{lobby['type']}** lobby code:\n```{lobby['code']}```"
-    )
-
-
-# ================== AUTO REPLY ==================
-@bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-
-    if "is someone hosting" in message.content.lower():
-        await message.channel.send(
-            f"We usually host at {AUTO_REPLY_TIMESTAMP},\n"
-            f"but you can always check {LOBBY_CHANNEL_NAME} for current lobbies!"
-        )# ================== RUN ==================
-bot.run(os.getenv("DISCORD_TOKEN"))
+client.run(TOKEN)
