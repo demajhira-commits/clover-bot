@@ -71,7 +71,7 @@ async def host(interaction: discord.Interaction, code: str):
     embed.add_field(name="Join code", value=f"`{code}`", inline=False)
     embed.set_footer(text="Use /endhost to close your lobby")
 
-    await interaction.response.send_message(content=ping, embed=embed allowed_mentions=discord.AllowedMentions(roles=True)
+    await interaction.response.send_message(content=ping, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True)
     )
 
 @tree.command(name="modhost", description="Host a modded lobby")
@@ -166,6 +166,7 @@ async def on_message(message: discord.Message):
         )
 
 client.run(TOKEN)
+
 
 
 
