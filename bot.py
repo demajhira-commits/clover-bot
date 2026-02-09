@@ -215,7 +215,9 @@ async def on_message(message: discord.Message):
   
   
 # ---- RUN ----  
+print ("TOKEN LOADED:", TOKEN is not None) 
 client.run(TOKEN)  
+
 
 
 
